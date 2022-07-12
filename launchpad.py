@@ -1,30 +1,28 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Thin MIDI wrapper for LAUNCHPAD PRO mk2 user.
+This is a python script to map MIDI input values to macros.
+(like a midi-to-macro)
+"""
+
 import mido
-import time
 import sys
-import csv
-import itertools
 from logging import getLogger
 
 import coloredlogs
 
-COLORS = {
-    "black": 0, #000000
-    "dark_gray": 1,#1C1C1C
-    "white": 4,#FCFCFC
-    "venetian_red": 5,#FF4D47
-    "blood_red": 6, #5A0100
-    "smokey_black": 7, #190000
-
-    "rajah": 8, #FFBD62
-    "mystic_red": 9, #FF5600
-    "seal_brown": 10, #5A1D00
-    "zinnwaldite_brown": 11, #231800
-    "yellow_sun": 12, #FDFD21
-    "dark_bronze": 13, #585800
-    "smokey_black": 14, #181800
-}
 
 class LaunchPadProMk2:
+    """LaunchPadProMk2
+
+    Attributes:
+        mode ([str]): Default is 'STANDALONE'.
+            If you use maintain of macros, use 'STANDALONE'.
+            For details, see 'programmers reference guide'.
+        logger ([logger]): your logger.
+        debug ([boolean]): debug mode.
+    """
     MODE = {
         "ABLETON": {
             "in": "Launchpad Pro",
@@ -39,23 +37,29 @@ class LaunchPadProMk2:
             "out": "MIDIOUT3 (Launchpad Pro)"
         }
     }
-    sleep_time = 1
 
-    def __init__(self, mode="STANDALONE"):
-        self.logger = getLogger(__name__)
-        coloredlogs.install(level='INFO', logger=self.logger)
+    def __init__(self, mode="STANDALONE", logger=None, debug=False):
+        if debug:
+            logger = getLogger(__name__)
+            coloredlogs.install(level='DEBUG', logger=logger)
+        if not logger:
+            self.logger = getLogger(__name__)
+            coloredlogs.install(level='INFO', logger=self.logger)
         midi_outputs = mido.get_output_names()
         midi_inputs = mido.get_input_names()
         self.MODE[mode]
         input_port = [x for x in midi_inputs if (self.MODE[mode]["in"] in x)]
-        output_port = [x for x in midi_outputs if (self.MODE[mode]["out"] in x)]
+        output_port = [x for x in midi_outputs if (
+            self.MODE[mode]["out"] in x)]
 
         # validation
         if len(input_port) >= 2:
-            self.logger.critical("Too many Launchpad Pro(input) exists. Only support 1")
+            self.logger.critical(
+                "Too many Launchpad Pro(input) exists. Only support 1")
             sys.exit()
         if len(output_port) >= 2:
-            self.logger.critical("Too many Launchpad Pro(output) exists. Only support 1")
+            self.logger.critical(
+                "Too many Launchpad Pro(output) exists. Only support 1")
             sys.exit()
         if not len(input_port) == 1:
             self.logger.critical("Launchpad Pro(input)is not exist.")
@@ -67,15 +71,30 @@ class LaunchPadProMk2:
         self._output_port_name = output_port[0]
 
     def open(self, callback=None):
-        self.input = mido.open_input(self._input_port_name)
+        """open midi port
+
+        Args:
+            callback ([function]): Your macro function.
+        """
+        self.input = mido.open_input(self._input_port_name, callback=callback)
         self.output = mido.open_output(self._output_port_name)
         self.input.callback = callback or self.default_msg_handle
 
     def close(self):
+        """close midi port
+        """
+        self.output.reset()
+        self.output.panic()
         self.input.close()
         self.output.close()
 
     def change_layout(self, layout_name):
+        """change layout
+
+        Args:
+            layout_name ([str]): If you use maintain of macros, use 'programmer'.
+                                 For details, see 'programmers reference guide'.
+        """
         msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 44])
         if layout_name == "note":
             msg.data += [0]
@@ -86,69 +105,98 @@ class LaunchPadProMk2:
         elif layout_name == "programmer":
             msg.data += [3]
         self.output.send(msg)
-        time.sleep(LaunchPadProMk2.sleep_time)
 
-    def column_lit(self, column, color=[1]):
-        if len(color) > 10:
+    def column_lit(self, column, colores=[1]):
+        """lit a column
+
+        Args:
+            column ([int]): Column number.
+            colores ([int]): Color numberes.(left to right)
+                             See 'Color' section in 'programmers reference guide'.
+        """
+        if len(colores) > 10:
             self.logger.warning("Column max is 10")
-            color = color[0:9]
+            colores = colores[0:9]
 
         msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 12, column])
-        msg.data += color
+        msg.data += colores
         self.output.send(msg)
-        time.sleep(LaunchPadProMk2.sleep_time)
 
-    def row_lit(self, column, color=[1]):
-        if len(color) > 10:
+    def row_lit(self, row, colores=[1]):
+        """lit a row
+
+        Args:
+            row ([int]): Row number.
+            colores ([int]): Color numberes.(bottom to up)
+                             See 'Color' section in 'programmers reference guide'.
+        """
+        if len(colores) > 10:
             self.logger.warning("Row max is 10")
-            color = color[0:9]
+            colores = colores[0:9]
 
-        msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 12, column])
-        msg.data += color
+        msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 13, row])
+        msg.data += colores
         self.output.send(msg)
-        time.sleep(LaunchPadProMk2.sleep_time)
 
     def all_lit(self, color=[1]):
-        msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 14])
-        msg.data += color
-        self.output.send(msg)
-        time.sleep(LaunchPadProMk2.sleep_time)
+        """lit solid color all pads
 
-    def set_lit(self, colors=[1]):
-        if len(colors) >= 97:
-            self.logger.warning(f"current color length is {len(colors)}. Max color length is 97")
-            colors = colors[:96]
+        Args:
+            color (int): Color number.
+                         See 'Color' and 'Layout' section in 'programmers reference guide'.
+        """
         msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 14])
-        msg.data += colors
+        msg.data += [color]
         self.output.send(msg)
-        time.sleep(LaunchPadProMk2.sleep_time)
+
+    def set_lit(self, colores=[1]):
+        """lit all pads
+
+        Args:
+            colores (int): Color numberes.
+                           See 'Color' and 'Layout' section in 'programmers reference guide'.
+        """
+        if len(colores) >= 97:
+            self.logger.warning(
+                f"current color length is {len(colores)}. Max color length is 97")
+            colores = colores[:96]
+        msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 14])
+        msg.data += colores
+        self.output.send(msg)
+
+    def all_on(self, channel=1):
+        """lit solid color all pads
+
+        Args:
+            channel (int): Channel number. (1~16)
+        """
+        if not (1 <= channel <= 15):
+            self.logger.error(
+                f"channel {channel} is invalid. (select from 1~16)")
+        channel -= 1
+        for i in range(1, 99):
+            msg = mido.Message('note_on', channel=channel,
+                               note=i, velocity=127)
+            self.output.send(msg)
+
+    def all_off(self, channel=1):
+        """unlit all pads
+
+        Args:
+            channel (int): Channel number. (1~16)
+        """
+        if not (1 <= channel <= 15):
+            self.logger.error(
+                f"channel {channel} is invalid. (select from 1~16)")
+        channel -= 1
+        for i in range(1, 99):
+            msg = mido.Message('note_off', channel=channel, note=i)
+            self.output.send(msg)
 
     def default_msg_handle(self, msg):
-        print("call handle", msg)
+        """default callback handler
 
-def main():
-    device = LaunchPadProMk2(mode="STANDALONE")
-    device.open()
-    # device.change_layout("note")
-    # device.change_layout("drum")
-    # device.change_layout("fader")
-    with open('led.csv') as f:
-        led_csv = csv.reader(f)
-        leds = [list(map(int, r)) for r in led_csv]
-        leds = list(itertools.chain.from_iterable(leds[1:]))
-        device.change_layout("programmer")
-        device.all_lit(color=[6])
-        device.set_lit(colors=leds)
-        # device.column_lit(0, color=[12, 12, 12, 12, 12, 12, 12, 12, 12, 12])
-
-    # wait for exit
-    exit = lambda: [device.close(), sys.exit(0)]
-    while True:
-        try:
-            keys = input("Press Ctrl+C to exit or enter quit.")
-        except KeyboardInterrupt:
-            exit()
-        if keys == 'quit' or keys == "q":
-            exit()
-
-main()
+        Args:
+            msg (Message): mido 'Message' object. For details, see Mido document.
+        """
+        self.logger.debug("Recive msg: ", msg)
