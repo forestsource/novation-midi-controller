@@ -9,7 +9,6 @@ import sys
 from launchpad import LaunchPadProMk2
 
 def callback(msg):
-    print(msg)
     if msg.type == 'sysex':
         print('sysex:', msg.data)
     elif msg.type == 'note_on':
