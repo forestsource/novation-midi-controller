@@ -90,7 +90,7 @@ class LaunchPadProMk2:
 
     def column_lit(self, column, color=[1]):
         if len(color) > 10:
-            self.logger.warn("Column max is 10")
+            self.logger.warning("Column max is 10")
             color = color[0:9]
 
         msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 12, column])
@@ -100,7 +100,7 @@ class LaunchPadProMk2:
 
     def row_lit(self, column, color=[1]):
         if len(color) > 10:
-            self.logger.warn("Row max is 10")
+            self.logger.warning("Row max is 10")
             color = color[0:9]
 
         msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 12, column])
@@ -116,7 +116,7 @@ class LaunchPadProMk2:
 
     def set_lit(self, colors=[1]):
         if len(colors) >= 97:
-            self.logger.warn(f"current color length is {len(colors)}. Max color length is 97")
+            self.logger.warning(f"current color length is {len(colors)}. Max color length is 97")
             colors = colors[:96]
         msg = mido.Message('sysex', data=[0, 32, 41, 2, 16, 14])
         msg.data += colors
