@@ -3,6 +3,7 @@ import time
 import sys
 import csv
 import itertools
+from logging import getLogger
 
 COLORS = {
     "black": 0, #000000
@@ -40,6 +41,7 @@ class LaunchPadProMk2:
     sleep_time = 1
 
     def __init__(self, mode="STANDALONE"):
+        self.logger = getLogger(__name__)
         midi_outputs = mido.get_output_names()
         midi_inputs = mido.get_input_names()
         self.MODE[mode]
@@ -49,16 +51,16 @@ class LaunchPadProMk2:
         # validation
         if len(input_port) >= 2:
             print("Too many Launchpad Pro(input) exists. Only support 1")
-            return
+            sys.exit()
         if len(output_port) >= 2:
             print("Too many Launchpad Pro(output) exists. Only support 1")
-            return
+            sys.exit()
         if not len(input_port) == 1:
             print("Launchpad Pro(input)is not exist.")
-            return
+            sys.exit()
         if not len(output_port) == 1:
             print("Launchpad Pro(output) is not exist.")
-            return
+            sys.exit()
         self._input_port_name = input_port[0]
         self._output_port_name = output_port[0]
 
